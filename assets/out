@@ -21,7 +21,7 @@ echo "Resource setup successful."
 namespace=$(jq -r '.source.namespace // "default"' < $payload)
 chart=$(jq -r '.params.chart // ""' < $payload)
 release_file=$(jq -r '.params.release // ""' < $payload)
-values=$(jq -r '.params.values // ""' < $payload)
+values=$(jq -r '.params.values | if type=="array" then join(" ") else . end' < $payload)
 wait_until_ready=$(jq -r '.params.wait_until_ready // 0' < $payload)
 debug=$(jq -r '.params.debug // "false"' < $payload)
 replace=$(jq -r '.params.replace // "false"' < $payload)
@@ -36,11 +36,14 @@ else
   release=$(jq -r '.source.release // ""' < $payload)
 fi
 
+echo "VALUES"
+echo $values
+
 
 is_deployed() {
   if [ -n "$1" ]; then
     set +e
-    helm status $1 | grep "STATUS: DEPLOYED" > /dev/null
+    helm status docker-demo-1 | grep "NAMESPACE: $NS_TEST" -C 1 | grep "STATUS: DEPLOYED" > /dev/null
     if [ $? = 0 ]; then
       # exists and is deployed
       echo true
@@ -61,7 +64,9 @@ helm_install() {
     helm_cmd="$helm_cmd -n $release"
   fi
   if [ -n "$values" ]; then
-    helm_cmd="$helm_cmd -f $source/$values"
+    for i in $values; do
+      helm_cmd="$helm_cmd -f $source/$i"
+    done
   fi
   if [ "$replace" = true ]; then
     helm_cmd="$helm_cmd --replace"
@@ -69,10 +74,10 @@ helm_install() {
   if [ "$debug" = true ]; then
     helm_cmd="$helm_cmd --dry-run --debug"
   fi
+  echo "$helm_cmd $source/$chart"
   logfile="/tmp/log"
   mkdir -p /tmp
   $helm_cmd $source/$chart | tee $logfile
-
   # Find the name of the release
   release=`cat $logfile | grep "NAME:" | awk '{print $2}'`
 }
@@ -86,11 +91,14 @@ current_revision() {
 helm_upgrade() {
   helm_cmd="helm upgrade $release"
   if [ -n "$values" ]; then
-    helm_cmd="$helm_cmd -f $source/$values"
+    for i in $values; do
+      helm_cmd="$helm_cmd -f $source/$i"
+    done
   fi
   if [ "$debug" = true ]; then
     helm_cmd="$helm_cmd --dry-run --debug"
   fi
+  echo "$helm_cmd $source/$chart"
   logfile="/tmp/log"
   mkdir -p /tmp
   set -x
