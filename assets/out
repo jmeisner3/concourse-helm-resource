@@ -43,7 +43,7 @@ echo $values
 is_deployed() {
   if [ -n "$1" ]; then
     set +e
-    helm status docker-demo-1 | grep "NAMESPACE: $NS_TEST" -C 1 | grep "STATUS: DEPLOYED" > /dev/null
+    helm status $1 | grep '.*[FAILED|DEPLOYED]' > /dev/null
     if [ $? = 0 ]; then
       # exists and is deployed
       echo true
